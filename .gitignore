@@ -1,0 +1,22 @@
+# Environnements virtuels
+venv/
+.venv/
+env/
+ENV/
+
+# Fichiers compilés Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Fichiers de distribution / build
+dist/
+build/
+*.egg-info/
+
+# Fichiers système macOS
+.DS_Store
+
+# Bases de données locales
+*.sqlite3
+*.db
