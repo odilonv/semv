@@ -1,80 +1,93 @@
-# 🧹 semv (Semantic Move)
+# semv — Semantic file organizer
 
-> **The command-line OS Agent that understands your files to organize them better.**
+A small command-line tool that reads file contents (text, code, PDF) and suggests clearer filenames
+and simple organization actions. semv runs in your terminal, offers a quick interactive review,
+and can run in the background to watch folders.
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org)
-[![Mistral AI](https://img.shields.io/badge/AI-Mistral-orange.svg)](https://mistral.ai)
-[![CLI](https://img.shields.io/badge/CLI-Typer-green.svg)](https://typer.tiangolo.com)
-
-Classic cleaning tools rely on file extensions or creation dates. `semv` reads the actual content of your files (PDF, Code, Text), extracts the semantic context, and uses Generative AI to propose standardized renaming and logical categorization. 
-
-All of this happens natively within your terminal.
 
 ---
 
-## ✨ Key Features
+## What it does
 
-* **🧠 Semantic Understanding:** Reads and comprehends the actual content of your documents, not just their metadata.
-* **🔒 Privacy-First (Hybrid):** Run inference 100% locally (GGUF) for sensitive data, or via the Cloud (Mistral API) to save disk space. You choose.
-* **👯 Duplicate Detection:** Identifies semantically identical files, even if their names are completely different (powered by ChromaDB).
-* **⚡ "Batch-Approval" Efficiency:** Ultra-fast TUI (Terminal User Interface). The AI proposes, you validate everything in one click (inspired by `lazygit`).
-* **📦 Zero Heavy Dependencies:** 100% Python. No Docker, no external background daemons required.
+semv extracts concise semantic information from files and uses it to propose:
 
----
+- human-friendly filenames and folder suggestions
+- detection of near-duplicate files using vector embeddings
+- batch review so you can accept or reject many suggestions at once
 
-## 🚀 Installation
-
-`semv` is designed to be installed globally on your machine using `pipx`.
-
-```bash
-# Direct installation from GitHub
-pipx install git+[https://github.com/odilonv/semv.git](https://github.com/odilonv/semv.git)
-```
-*Upon the first execution, an interactive setup wizard will guide you to choose your inference engine (Local or Cloud).*
-
-## 💻 Usage
-
-The tool is built around 3 simple commands:
-
-### 1. Background Watcher
-Launch the silent daemon that monitors your target directories (e.g., Downloads).
-```bash
-semv daemon
-```
-*As soon as 10 files are processed and ready to be organized, you will receive a native OS notification.*
-
-### 2. Forced Directory Scan
-Ideal for cleaning up a messy folder or an old hard drive in one go.
-```bash
-semv scan --path ~/Downloads
-```
-
-### 3. Review and Organize
-Open the interactive terminal interface to validate the AI's proposals.
-```bash
-semv review
-```
-
-## 🛠️ Under the Hood (Architecture)
-
-This project was built to demonstrate a robust, asynchronous, and modern AI software architecture:
-
-* **CLI & TUI:** `Typer`, `Rich`, `Questionary`.
-* **Asynchronous Core:** `asyncio`, `watchdog` for OS-level event listening, and non-blocking I/O operations.
-* **State & Memory:** `SQLite` (via `aiosqlite`) for process resilience.
-* **RAG & Vectors:** Embedded `ChromaDB`.
-* **LLM Engine:** `llama-cpp-python` (Local) / `mistralai` (Cloud) using the Strategy Pattern.
-* **Structured Outputs:** `instructor` + `Pydantic v2` to constrain the LLM into strict JSON schemas.
+You decide how suggestions are applied — nothing is renamed without your confirmation.
 
 ---
 
-## 🤝 Contributing
+## Key points
 
-Pull Requests are highly welcome. For local development:
+- Content-aware: works from file content, not just extensions or timestamps.
+- Privacy-first: supports local model inference (no cloud) or optional cloud APIs.
+- Lightweight: written in Python, no Docker required for normal use.
+- Watcher mode: optional daemon watches folders and queues items for review.
+
+---
+
+## Install
+
+Recommended (install globally with pipx):
 
 ```bash
-git clone [https://github.com/odilonv/semv.git](https://github.com/odilonv/semv.git)
+pipx install git+https://github.com/odilonv/semv.git
+```
+
+Or for local development:
+
+```bash
+git clone https://github.com/odilonv/semv.git
 cd semv
 poetry install
 pip install -e .
 ```
+
+---
+
+## Usage (examples)
+
+- Start background watcher:
+
+```bash
+semv daemon
+```
+
+- Scan a folder immediately:
+
+```bash
+semv scan --path ~/Downloads
+```
+
+- Open the interactive review UI:
+
+```bash
+semv review
+```
+
+---
+
+## Internals (brief)
+
+- CLI: `Typer` + a lightweight TUI for batch review
+- Storage: SQLite for state and resilience
+- Embeddings/DB: ChromaDB for deduplication and similarity
+- Models: local inference via `llama-cpp-python` or remote APIs
+
+---
+
+## Contributing
+
+Patches and issues welcome. Quick start for contributors:
+
+```bash
+git clone https://github.com/odilonv/semv.git
+cd semv
+poetry install
+pip install -e .
+```
+
+If you add features, please include tests or a short usage example.
