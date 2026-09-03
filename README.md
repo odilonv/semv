@@ -1,6 +1,6 @@
-# semv — Semantic File Organizer
+# semv - Semantic File Organizer
 
-An agentic command-line tool that reads file contents (text, code, PDF), understands them semantically, and proposes intelligent organization — renaming, categorizing into folders, and cleaning up junk. Powered by a **LangGraph ReAct agent** with Mistral AI, semv doesn't just follow rules: it _reasons_ about your files.
+An agentic command-line tool that reads file contents (text, code, PDF), understands them semantically, and proposes intelligent organization: renaming, categorizing into folders, and cleaning up junk. Powered by a **LangGraph ReAct agent** with Mistral AI, semv doesn't just follow rules, it _reasons_ about your files.
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org)
 [![LangGraph](https://img.shields.io/badge/LangGraph-ReAct_Agent-orange.svg)](https://langchain-ai.github.io/langgraph/)
@@ -17,7 +17,7 @@ semv organize ~/Downloads
 
 1. The **agent** autonomously explores the directory structure.
 2. It reads the content of each file (text, code, PDF).
-3. It proposes a full reorganization plan — displayed as an interactive table in your terminal.
+3. It proposes a full reorganization plan, displayed as an interactive table in your terminal.
 4. **You decide**: approve, provide natural-language feedback to adjust, or cancel.
 
 ```text
@@ -29,7 +29,7 @@ semv organize ~/Downloads
 │ IMG_20240315.pdf           │ Finance/Invoices    │ invoice_march_2024  │    95%     │
 │ setup_v2.tmp               │ [Recycle Bin]       │ setup_v2.tmp        │   100%     │
 │ notes.txt                  │ Personal/Notes      │ grocery_list.txt    │    80%     │
-│ Code/script.js             │ Already Organized     │ -                   │   100%     │
+│ Code/script.js             │ Already Organized   │ -                   │    100%    │
 └────────────────────────────┴─────────────────────┴─────────────────────┴────────────┘
 
 ? What would you like to do? (Use arrow keys)
@@ -38,7 +38,7 @@ semv organize ~/Downloads
    [Cancel] Do not make changes
 ```
 
-Files targeted for the **[Recycle Bin]** are safely sent to your operating system's Recycle Bin (Windows) or Trash (macOS/Linux) — never permanently deleted.
+Files targeted for the **[Recycle Bin]** are safely sent to your operating system's Recycle Bin (Windows) or Trash (macOS/Linux) and are never permanently deleted.
 
 ---
 
@@ -46,7 +46,7 @@ Files targeted for the **[Recycle Bin]** are safely sent to your operating syste
 
 | Feature                       | Description                                                                                                             |
 | :---------------------------- | :---------------------------------------------------------------------------------------------------------------------- |
-| **Agentic AI**                | A LangGraph ReAct agent that autonomously explores and reasons — not a simple prompt-response pipeline.                 |
+| **Agentic AI**                | A LangGraph ReAct agent that autonomously explores and reasons, rather than a simple prompt-response pipeline.                 |
 | **Interactive feedback loop** | Reject a proposal, type natural-language corrections (_"Put images in Assets, not Media"_), and the agent re-evaluates. |
 | **Content-aware**             | Extracts file contents and metadata to understand semantics. Supports plain text, code, PDFs, and Image EXIF.           |
 | **Parallel Extraction**       | Uses `asyncio` to read hundreds of files concurrently before invoking the LLM, making analysis blazing fast.            |
