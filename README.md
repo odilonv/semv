@@ -20,8 +20,7 @@ semv organize ~/Downloads
 3. It proposes a full reorganization plan — displayed as an interactive table in your terminal.
 4. **You decide**: approve, provide natural-language feedback to adjust, or cancel.
 
-```
-```
+```text
                               Agent Proposed Organization                              
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
 ┃ Original File              ┃ New Folder          ┃ New Name            ┃ Confidence ┃
@@ -65,7 +64,7 @@ Files marked as **Junk** are safely sent to your operating system's **Recycle Bi
 ```mermaid
 graph TB
     subgraph CLI ["CLI Layer (Typer + Rich)"]
-        A["semv organize &lt;path&gt;"]
+        A["semv organize <path>"]
     end
 
     subgraph Agent ["Agentic Core (LangGraph)"]
