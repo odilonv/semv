@@ -29,7 +29,7 @@ semv organize ~/Downloads
 │ IMG_20240315.pdf           │ Finance/Invoices    │ invoice_march_2024  │    95%     │
 │ setup_v2.tmp               │ [Recycle Bin]       │ setup_v2.tmp        │   100%     │
 │ notes.txt                  │ Personal/Notes      │ grocery_list.txt    │    80%     │
-│ Code/script.js             │ [dim]Already Organized[/dim]  │ [dim]-[/dim]                  │   [dim]100%[/dim]     │
+│ Code/script.js             │ Already Organized     │ -                   │   100%     │
 └────────────────────────────┴─────────────────────┴─────────────────────┴────────────┘
 
 ? What would you like to do? (Use arrow keys)
@@ -38,7 +38,7 @@ semv organize ~/Downloads
    [Cancel] Do not make changes
 ```
 
-Files marked as **Junk** are safely sent to your operating system's **Recycle Bin** (Windows) or **Trash** (macOS/Linux) — never permanently deleted.
+Files targeted for the **[Recycle Bin]** are safely sent to your operating system's Recycle Bin (Windows) or Trash (macOS/Linux) — never permanently deleted.
 
 ---
 
@@ -50,7 +50,7 @@ Files marked as **Junk** are safely sent to your operating system's **Recycle Bi
 | **Interactive feedback loop** | Reject a proposal, type natural-language corrections (_"Put images in Assets, not Media"_), and the agent re-evaluates. |
 | **Content-aware**             | Extracts file contents and metadata to understand semantics. Supports plain text, code, PDFs, and Image EXIF.           |
 | **Parallel Extraction**       | Uses `asyncio` to read hundreds of files concurrently before invoking the LLM, making analysis blazing fast.            |
-| **Smart Deduplication**       | Computes SHA-256 hashes during the scan. Exact duplicates are automatically flagged as Junk to save time and tokens.    |
+| **Smart Deduplication**       | Computes SHA-256 hashes during the scan. Exact duplicates are automatically flagged for the [Recycle Bin] to save time and tokens.    |
 | **Safe Undo (`semv undo`)**   | Automatically logs operations to `history.json`. Revert the last batch of moves with a single command.                  |
 | **Custom Taxonomy**           | Define your own master categories in `semv config` or rely on the expert defaults (Work, Finance, Media, etc).          |
 | **Human-in-the-loop**         | Nothing is moved, renamed, or deleted without your explicit approval.                                                   |
