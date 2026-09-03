@@ -11,6 +11,7 @@ from semv.config import load_config, save_config, is_configured, run_setup_wizar
 from semv.organizer import apply_file_action, trash_file, HISTORY_FILE, clear_history
 from semv.agent.organizer_agent import run_organizer_agent
 from semv.text_extraction import analyze_file_async
+import time
 
 app = typer.Typer(help="Semv: Semantic File Organizer")
 console = Console()
@@ -23,7 +24,11 @@ def _print_proposals(proposals: dict, root_dir_str: str):
     table.add_column("New Name", style="green", overflow="fold")
     table.add_column("Confidence", justify="center")
 
-    for file_path, action in proposals.items():
+    MAX_ROWS = 200
+    items = list(proposals.items())
+    displayed_items = items[:MAX_ROWS]
+
+    for file_path, action in displayed_items:
         conf = action.get("confidence", 85)
         if conf >= 85:
             conf_str = f"[bold green]{conf}%[/bold green]"
@@ -74,6 +79,11 @@ def _print_proposals(proposals: dict, root_dir_str: str):
                     conf_str
                 )
     console.print(table)
+    
+    if len(items) > MAX_ROWS:
+        remaining = len(items) - MAX_ROWS
+        console.print(f"[dim]... and {remaining} more files not shown. (Approve will apply to all {len(items)} files)[/dim]")
+        
     console.print("\n")
 
 @app.command()
@@ -189,20 +199,44 @@ def organize(
             
     console.print(f"[bold cyan]Agent is deciding organization for {len(files_for_agent)} unique files...[/bold cyan]")
     
+    BATCH_SIZE = 10
+    batches = [files_for_agent[i:i + BATCH_SIZE] for i in range(0, len(files_for_agent), BATCH_SIZE)]
+    
     feedback = None
     while True:
+        agent_proposals_all = {}
         try:
-            if is_multi:
-                from semv.agent.multi_agent import run_multi_agent
-                agent_proposals = run_multi_agent(str(target_dir), files_for_agent, feedback=feedback)
-            else:
-                agent_proposals = run_organizer_agent(str(target_dir), files_for_agent, feedback=feedback)
-            
+            for i, batch in enumerate(track(batches, description="Processing batches...")):
+                retry_count = 0
+                max_retries = 8
+                while retry_count < max_retries:
+                    try:
+                        if is_multi:
+                            from semv.agent.multi_agent import run_multi_agent
+                            batch_proposals = run_multi_agent(str(target_dir), batch, feedback=feedback)
+                        else:
+                            batch_proposals = run_organizer_agent(str(target_dir), batch, feedback=feedback)
+                        
+                        agent_proposals_all.update(batch_proposals)
+                        break # Success
+                    except Exception as e:
+                        if "429" in str(e):
+                            retry_count += 1
+                            if retry_count >= max_retries:
+                                raise e
+                            # Exponential backoff: 2s, 4s, 8s, 16s...
+                            time.sleep(2 ** retry_count)
+                        else:
+                            raise e
+                
+                if i < len(batches) - 1:
+                    time.sleep(2) # Prevent API rate limit (429)
+
             # Defense in depth: The LLM sometimes truncates the absolute path to just the basename.
             # We need to map it back to the true absolute path.
             valid_paths = [f["path"] for f in files_for_agent]
             corrected_proposals = {}
-            for k, v in agent_proposals.items():
+            for k, v in agent_proposals_all.items():
                 if k in valid_paths:
                     corrected_proposals[k] = v
                 else:

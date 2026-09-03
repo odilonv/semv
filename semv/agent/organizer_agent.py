@@ -52,7 +52,7 @@ def run_organizer_agent(directory_path: str, files_with_content: list[dict], fee
     files_with_content is a list of dicts: {"path": str, "content": str}
     """
     api_key = _resolve_api_key()
-    llm = ChatMistralAI(model="mistral-small-latest", temperature=0, api_key=api_key)
+    llm = ChatMistralAI(model="mistral-small-latest", temperature=0, api_key=api_key, max_retries=10)
 
     proposals: dict = {}
     propose_tool = build_propose_tool(proposals)

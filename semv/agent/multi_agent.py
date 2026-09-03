@@ -68,7 +68,7 @@ def create_specialized_agent(files: list[dict], directory_path: str, feedback: s
         return {"proposals": {}}
         
     api_key = _resolve_api_key()
-    llm = ChatMistralAI(model="mistral-small-latest", temperature=0, api_key=api_key)
+    llm = ChatMistralAI(model="mistral-small-latest", temperature=0, api_key=api_key, max_retries=10)
     
     proposals = {}
     propose_tool = build_propose_tool(proposals)
