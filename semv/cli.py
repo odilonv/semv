@@ -8,7 +8,7 @@ import questionary
 import json
 import shutil
 from semv.config import load_config, save_config, is_configured, run_setup_wizard
-from semv.organizer import apply_file_action, trash_file, HISTORY_FILE
+from semv.organizer import apply_file_action, trash_file, HISTORY_FILE, clear_history
 from semv.agent.organizer_agent import run_organizer_agent
 from semv.text_extraction import analyze_file_async
 
@@ -237,6 +237,7 @@ def organize(
         ).ask()
         
         if choice == "approve":
+            clear_history()
             success_count = 0
             for file_path, action in proposals.items():
                 if action["is_junk"]:

@@ -8,6 +8,11 @@ from datetime import datetime
 console = Console()
 HISTORY_FILE = Path.home() / ".config" / "semv" / "history.json"
 
+def clear_history():
+    HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(HISTORY_FILE, "w") as f:
+        json.dump([], f)
+
 def _log_action(original_path: str, new_path: str, action: str):
     HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
     history = []
