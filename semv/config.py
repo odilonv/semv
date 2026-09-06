@@ -4,23 +4,49 @@ from pathlib import Path
 import questionary
 from rich.console import Console
 
+from semv.logger import get_logger
+
+logger = get_logger("config")
+
 CONFIG_DIR = Path.home() / ".config" / "semv"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 _console = Console()
 
+# Default configuration values
+DEFAULTS = {
+    "batch_threshold": 100,              # Auto-suggest batch above this
+    "batch_force_threshold": 500,        # Force batch above this
+    "max_concurrent_extractions": 50,    # Bounded concurrency for file I/O
+    "api_retry_max": 10,                 # Max retries on API errors
+    "realtime_batch_size": 10,           # Files per agent call (real-time)
+    "snippet_length": 2000,             # Max chars extracted per file
+    "snippet_length_batch": 500,        # Max chars in batch mode (token saving)
+}
+
 
 def load_config() -> dict:
     if not CONFIG_FILE.exists():
         return {}
-    with open(CONFIG_FILE, "r") as f:
-        return json.load(f)
+    try:
+        with open(CONFIG_FILE, "r") as f:
+            return json.load(f)
+    except Exception as e:
+        logger.warning("Failed to load config: %s", e)
+        return {}
 
 
 def save_config(config_data: dict):
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     with open(CONFIG_FILE, "w") as f:
         json.dump(config_data, f, indent=4)
+    logger.debug("Config saved to %s", CONFIG_FILE)
+
+
+def get_setting(key: str, default=None):
+    """Get a config setting with fallback to DEFAULTS, then to provided default."""
+    config = load_config()
+    return config.get(key, DEFAULTS.get(key, default))
 
 
 def is_configured() -> bool:
@@ -57,3 +83,4 @@ def run_setup_wizard():
             config_data["taxonomy"] = [t.strip() for t in custom_tax.split(",")]
     
     save_config(config_data)
+    logger.info("Setup wizard completed (mode=%s)", mode)
