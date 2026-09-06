@@ -222,6 +222,12 @@ def _correct_proposal_paths(agent_proposals: dict, valid_paths: list[str]) -> di
 # ---------------------------------------------------------------------------
 
 @app.command()
+def config():
+    """Run the interactive configuration wizard to set API keys and taxonomy."""
+    run_setup_wizard()
+
+
+@app.command()
 def undo():
     """Undo the last file organization operations."""
     setup_logging()
