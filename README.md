@@ -21,7 +21,7 @@ semv organize ~/Downloads
 4. **You decide**: approve, provide natural-language feedback to adjust, or cancel.
 
 ```text
-                              Agent Proposed Organization                              
+                              Agent Proposed Organization
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
 ┃ Original File              ┃ New Folder          ┃ New Name            ┃ Confidence ┃
 ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩
@@ -44,17 +44,17 @@ Files targeted for the **[Recycle Bin]** are safely sent to your operating syste
 
 ## Key features
 
-| Feature                       | Description                                                                                                             |
-| :---------------------------- | :---------------------------------------------------------------------------------------------------------------------- |
-| **Agentic AI**                | A LangGraph ReAct agent that autonomously explores and reasons, rather than a simple prompt-response pipeline.                 |
-| **Directory Reasoning (New!)**| The AI treats directories as cohesive entities, deciding whether to move entire folders intact or split open messy dump folders. |
-| **Interactive feedback loop** | Reject a proposal, type natural-language corrections (_"Put images in Assets, not Media"_), and the agent re-evaluates. |
-| **Content-aware**             | Extracts file contents and metadata to understand semantics. Supports plain text, code, PDFs, and Image EXIF.           |
-| **Parallel Extraction**       | Uses `asyncio` to read hundreds of files concurrently before invoking the LLM, making analysis blazing fast.            |
-| **Smart Deduplication**       | Computes SHA-256 hashes during the scan. Exact duplicates are automatically flagged for the [Recycle Bin] to save time and tokens.    |
-| **Safe Undo (`semv undo`)**   | Automatically logs operations to `history.json`. Revert the last batch of moves with a single command.                  |
-| **Custom Taxonomy**           | Define your own master categories in `semv config` or rely on the expert defaults (Work, Finance, Media, etc).          |
-| **Human-in-the-loop**         | Nothing is moved, renamed, or deleted without your explicit approval.                                                   |
+| Feature                       | Description                                                                                                                        |
+| :---------------------------- | :--------------------------------------------------------------------------------------------------------------------------------- |
+| **Agentic AI**                | A LangGraph ReAct agent that autonomously explores and reasons, rather than a simple prompt-response pipeline.                     |
+| **Directory Reasoning**       | The AI treats directories as cohesive entities, deciding whether to move entire folders intact or split open messy dump folders.   |
+| **Interactive feedback loop** | Reject a proposal, type natural-language corrections (_"Put images in Assets, not Media"_), and the agent re-evaluates.            |
+| **Content-aware**             | Extracts file contents and metadata to understand semantics. Supports plain text, code, PDFs, and Image EXIF.                      |
+| **Parallel Extraction**       | Uses `asyncio` to read hundreds of files concurrently before invoking the LLM, making analysis blazing fast.                       |
+| **Smart Deduplication**       | Computes SHA-256 hashes during the scan. Exact duplicates are automatically flagged for the [Recycle Bin] to save time and tokens. |
+| **Safe Undo (`semv undo`)**   | Automatically logs operations to `history.json`. Revert the last batch of moves with a single command.                             |
+| **Custom Taxonomy**           | Define your own master categories in `semv config` or rely on the expert defaults (Work, Finance, Media, etc).                     |
+| **Human-in-the-loop**         | Nothing is moved, renamed, or deleted without your explicit approval.                                                              |
 
 ---
 
@@ -166,14 +166,14 @@ semv/
 
 ### Module responsibilities
 
-| Module                     | Role                                                                                                                                                                                     |
-| :------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cli.py`                   | Entry point. Registers all Typer commands. Houses the interactive `organize` loop (propose → display → approve/feedback/cancel).                                                         |
-| `agent/organizer_agent.py` | Constructs the LangGraph `create_react_agent` with Mistral AI, injects tools and system prompt, handles user feedback injection.                                                         |
-| `agent/tools.py`           | Defines the `@tool`-decorated functions the agent can call: directory listing, file reading, and proposal registration via injection.                                                    |
-| `organizer.py`             | Physical file operations. `apply_file_action` creates target folders and moves files with `shutil.move`. `trash_file` sends junk to the OS Recycle Bin via `send2trash`.                 |
-| `text_extraction.py`       | Shared logic to safely extract the first 2000 characters from plain text or PDF files (via PyMuPDF).                                                                                     |
-| `config.py`                | Manages persistent JSON configuration at `~/.config/semv/config.json` (API key, inference mode) and the interactive setup wizard.                                                        |
+| Module                     | Role                                                                                                                                                                     |
+| :------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cli.py`                   | Entry point. Registers all Typer commands. Houses the interactive `organize` loop (propose → display → approve/feedback/cancel).                                         |
+| `agent/organizer_agent.py` | Constructs the LangGraph `create_react_agent` with Mistral AI, injects tools and system prompt, handles user feedback injection.                                         |
+| `agent/tools.py`           | Defines the `@tool`-decorated functions the agent can call: directory listing, file reading, and proposal registration via injection.                                    |
+| `organizer.py`             | Physical file operations. `apply_file_action` creates target folders and moves files with `shutil.move`. `trash_file` sends junk to the OS Recycle Bin via `send2trash`. |
+| `text_extraction.py`       | Shared logic to safely extract the first 2000 characters from plain text or PDF files (via PyMuPDF).                                                                     |
+| `config.py`                | Manages persistent JSON configuration at `~/.config/semv/config.json` (API key, inference mode) and the interactive setup wizard.                                        |
 
 ---
 
@@ -252,10 +252,11 @@ You can test `semv` safely using the provided example folders. These folders con
 # Test the basic AI categorization
 poetry run semv organize examples/test_folder/ --dry-run
 
-# Test the new Directory Reasoning (complex folder with nested projects and messy dumps)
+# Test the Directory Reasoning (complex folder with nested projects and messy dumps)
 poetry run semv organize examples/test_folder_advanced/ --dry-run
 ```
-*(The `--dry-run` flag ensures no files are actually moved on your disk).*
+
+_(The `--dry-run` flag ensures no files are actually moved on your disk)._
 
 **Workflow:**
 
@@ -267,19 +268,23 @@ poetry run semv organize examples/test_folder_advanced/ --dry-run
    - **Feedback** — type corrections in natural language, agent re-proposes.
    - **Cancel** — nothing happens.
 
-### The Multi-Agent Expert Mode (New!)
+### The Multi-Agent Expert Mode
 
 For extremely complex directories, `semv` now features an interactive choice when you run `organize`:
+
 ```bash
 semv organize ~/Downloads
 ```
+
 It will ask you to choose between:
+
 1. **Fast Mode** (Single General Agent)
 2. **Expert Mode** (Multi-Agent Team)
 
-*(You can bypass the prompt by adding the `--multi-agent` flag).*
+_(You can bypass the prompt by adding the `--multi-agent` flag)._
 
 In Expert mode, a **Supervisor Agent** analyzes the files and distributes them to specialized experts:
+
 - **Code Agent**: Highly specialized in categorizing source code (`.py`, `.js`) into frameworks and languages.
 - **Finance Agent**: Highly specialized in extracting amounts and dates from invoices and budgets (`.csv`, `.pdf`) for precise renaming.
 - **General Agent**: Handles standard documents, images, and personal files.
@@ -291,6 +296,7 @@ Reverts the very last batch of file organizations. If you made a mistake during 
 ```bash
 semv undo
 ```
+
 ---
 
 ## Technology stack
@@ -315,11 +321,11 @@ semv undo
 
 The agent has access to two tools, each defined with a Pydantic schema for strict input validation:
 
-| Tool                       | Purpose                                         | Schema fields                                                                                  |
-| :------------------------- | :---------------------------------------------- | :--------------------------------------------------------------------------------------------- |
-| `list_directory_tool`      | Explore folder structure                        | `path: str`                                                                                    |
-| `propose_file_action_tool` | Register a categorization decision              | `file_path`, `suggested_name`, `suggested_category`, `summary_reason`, `is_junk`, `confidence` |
-| `propose_directory_action_tool`| Register a decision for an entire folder    | `directory_path`, `decision` (move_intact or split), `suggested_name`, `suggested_category`, `summary_reason`, `confidence` |
+| Tool                            | Purpose                                  | Schema fields                                                                                                               |
+| :------------------------------ | :--------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------- |
+| `list_directory_tool`           | Explore folder structure                 | `path: str`                                                                                                                 |
+| `propose_file_action_tool`      | Register a categorization decision       | `file_path`, `suggested_name`, `suggested_category`, `summary_reason`, `is_junk`, `confidence`                              |
+| `propose_directory_action_tool` | Register a decision for an entire folder | `directory_path`, `decision` (move_intact or split), `suggested_name`, `suggested_category`, `summary_reason`, `confidence` |
 
 ### ReAct reasoning pattern
 
