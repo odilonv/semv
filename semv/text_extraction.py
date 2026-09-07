@@ -87,6 +87,9 @@ def _extract_plain_text(file_path: Path, max_length: int = MAX_SNIPPET_LENGTH) -
 
 def extract_text(file_path: Path, max_length: int = MAX_SNIPPET_LENGTH) -> str:
     """Synchronous text extraction. Routes by file extension."""
+    if file_path.is_dir():
+        return "[DIRECTORY] A folder containing files. Use list_directory_tool to see its contents."
+        
     ext = file_path.suffix.lower()
     if ext in (".jpg", ".jpeg", ".png", ".heic", ".tiff", ".bmp", ".webp"):
         return _extract_image_exif(file_path)
@@ -112,7 +115,10 @@ async def analyze_file_async(
     """
     async def _do_extract():
         try:
-            f_hash = _get_file_hash(file_path)
+            if file_path.is_dir():
+                f_hash = ""
+            else:
+                f_hash = _get_file_hash(file_path)
             content = extract_text(file_path, max_snippet_length)
             size = file_path.stat().st_size if file_path.exists() else 0
             return {

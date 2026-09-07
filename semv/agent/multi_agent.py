@@ -6,7 +6,12 @@ from langchain_mistralai import ChatMistralAI
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import create_react_agent
 
-from semv.agent.tools import list_directory_tool, build_propose_tool
+from semv.agent.tools import (
+    list_directory_tool,
+    read_file_snippet_tool,
+    build_propose_tool,
+    build_propose_directory_tool,
+)
 from semv.config import load_config
 from semv.logger import get_logger
 from semv.rate_limiter import RateLimiter, with_retry
@@ -109,8 +114,9 @@ def create_specialized_agent(
         )
         
         proposals = {}
-        propose_tool = build_propose_tool(proposals)
-        tools = [list_directory_tool, propose_tool]
+        propose_tool = build_propose_tool(proposals, rate_limiter=rate_limiter)
+        propose_dir_tool = build_propose_directory_tool(proposals, rate_limiter=rate_limiter)
+        tools = [list_directory_tool, read_file_snippet_tool, propose_tool, propose_dir_tool]
         
         prompt = role_prompt
         if feedback:
@@ -175,8 +181,17 @@ RULES:
 1. Always put them in the 'Finance' root folder.
 2. Group by type (e.g., 'Finance/Invoices', 'Finance/Receipts', 'Finance/Budgets').
 3. Extract dates, amounts, and client names for renaming (e.g., 'invoice_clientName_march2024.pdf').
-4. Calibrate confidence: 95-100 obvious, 70-85 educated guesses, <60 ambiguous.
-5. Use propose_file_action_tool for EVERY file."""
+4. Calibrate confidence: 95-100 obvious, 70-85 educated guesses, <60.
+
+For FILES:
+- Use propose_file_action_tool to decide its category and name.
+
+For DIRECTORIES:
+- Analyze its name. If unsure, use list_directory_tool to see what's inside.
+- If it's a cohesive project, asset pack, or logical grouping (e.g., 'Project_Alpha', 'React_Template'), use propose_directory_action_tool with decision='move_intact'.
+- If it's a messy dump folder with unrelated files (e.g., 'New folder', 'temp_dump', 'Desktop_files'), use propose_directory_action_tool with decision='split'.
+
+You MUST call propose_file_action_tool or propose_directory_action_tool for EVERY item provided."""
     return create_specialized_agent(
         state["finance_files"], state["directory_path"], state["feedback"],
         prompt, "Finance", _rate_limiter,

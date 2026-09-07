@@ -3,7 +3,12 @@ import os
 from langchain_mistralai import ChatMistralAI
 from langgraph.prebuilt import create_react_agent
 
-from semv.agent.tools import list_directory_tool, build_propose_tool
+from semv.agent.tools import (
+    list_directory_tool,
+    read_file_snippet_tool,
+    build_propose_tool,
+    build_propose_directory_tool,
+)
 from semv.config import load_config
 from semv.logger import get_logger
 from semv.rate_limiter import RateLimiter, with_retry
@@ -15,11 +20,19 @@ You are an advanced agentic file organizer.
 Your goal is to organize files in a given directory by suggesting a new name and a category (folder) for each file.
 
 Steps:
-1. Use `list_directory_tool` on the target directory to see existing folders.
-2. Call `propose_file_action_tool` for EACH file to register your decision.
+For FILES:
+- Use propose_file_action_tool to decide its category and name.
+
+For DIRECTORIES:
+- Analyze its name. If unsure, use list_directory_tool to see what's inside.
+- If it's a cohesive project, asset pack, or logical grouping (e.g., 'Project_Alpha', 'React_Template'), use propose_directory_action_tool with decision='move_intact'.
+- If it's a messy dump folder with unrelated files (e.g., 'New folder', 'temp_dump', 'Desktop_files'), use propose_directory_action_tool with decision='split'.
+
+You MUST call propose_file_action_tool or propose_directory_action_tool for EVERY item provided.
 
 TAXONOMY RULES:
-- Use broad root folders with logical subfolders (e.g., 'Work/Meetings', 'Finance/Invoices', 'Code/Python').
+- Use broad root folders with logical subfolders, and don't hesitate to create specific sub-topic folders inside them if it makes sense (e.g., 'Work/Meetings/Q3', 'Finance/Invoices/2024', 'Media/Images/Personal/Vacances_plage').
+- Keep names clean, descriptive, snake_case, and without dates unless crucial.
 - ONLY use these ROOT folders unless impossible:
   * 'Work' (Professional documents, business reports, meeting notes)
   * 'Personal' (Private notes, grocery lists, personal letters)
@@ -66,9 +79,10 @@ def run_organizer_agent(
     )
 
     proposals: dict = {}
-    propose_tool = build_propose_tool(proposals)
+    propose_tool = build_propose_tool(proposals, rate_limiter=rate_limiter)
+    propose_dir_tool = build_propose_directory_tool(proposals, rate_limiter=rate_limiter)
 
-    tools = [list_directory_tool, propose_tool]
+    tools = [list_directory_tool, propose_tool, propose_dir_tool]
 
     config = load_config()
     custom_tax = config.get("taxonomy")
@@ -104,5 +118,5 @@ def run_organizer_agent(
     else:
         _invoke()
 
-    logger.info("Agent returned %d proposals", len(proposals))
+    logger.debug("Agent returned %d proposals", len(proposals))
     return proposals

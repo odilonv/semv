@@ -47,6 +47,7 @@ Files targeted for the **[Recycle Bin]** are safely sent to your operating syste
 | Feature                       | Description                                                                                                             |
 | :---------------------------- | :---------------------------------------------------------------------------------------------------------------------- |
 | **Agentic AI**                | A LangGraph ReAct agent that autonomously explores and reasons, rather than a simple prompt-response pipeline.                 |
+| **Directory Reasoning (New!)**| The AI treats directories as cohesive entities, deciding whether to move entire folders intact or split open messy dump folders. |
 | **Interactive feedback loop** | Reject a proposal, type natural-language corrections (_"Put images in Assets, not Media"_), and the agent re-evaluates. |
 | **Content-aware**             | Extracts file contents and metadata to understand semantics. Supports plain text, code, PDFs, and Image EXIF.           |
 | **Parallel Extraction**       | Uses `asyncio` to read hundreds of files concurrently before invoking the LLM, making analysis blazing fast.            |
@@ -71,6 +72,7 @@ graph TB
         D["ReAct Agent<br/>(Mistral AI)"]
         E["list_directory_tool"]
         G["propose_file_action_tool"]
+        H["propose_directory_action_tool"]
     end
 
     subgraph Storage ["Storage Layer"]
@@ -85,7 +87,9 @@ graph TB
     A -->|"invokes"| D
     D -->|"calls"| E
     D -->|"calls"| G
+    D -->|"calls"| H
     G -->|"stores proposals"| D
+    H -->|"stores proposals"| D
     D -->|"returns proposals"| A
     A -->|"user approves"| J
     A -->|"junk files"| K
@@ -112,7 +116,7 @@ sequenceDiagram
         Tools-->>Agent: [DIR] Finance, [DIR] Work...
         Note over Agent: Thought: Group related files by context
         Agent->>Tools: propose_file_action_tool(file_1)
-        Agent->>Tools: propose_file_action_tool(file_2)
+        Agent->>Tools: propose_directory_action_tool(dir_1)
         Tools-->>Agent: Proposals recorded
     end
 
@@ -240,6 +244,19 @@ semv organize .
 semv organize ./project/assets
 ```
 
+### Try the Examples!
+
+You can test `semv` safely using the provided example folders. These folders contain dummy files to demonstrate the AI's reasoning capabilities without touching your real data.
+
+```bash
+# Test the basic AI categorization
+poetry run semv organize examples/test_folder/ --dry-run
+
+# Test the new Directory Reasoning (complex folder with nested projects and messy dumps)
+poetry run semv organize examples/test_folder_advanced/ --dry-run
+```
+*(The `--dry-run` flag ensures no files are actually moved on your disk).*
+
 **Workflow:**
 
 1. `semv` reads all files in parallel via `asyncio` and hashes them (SHA-256) to find duplicates instantly.
@@ -302,6 +319,7 @@ The agent has access to two tools, each defined with a Pydantic schema for stric
 | :------------------------- | :---------------------------------------------- | :--------------------------------------------------------------------------------------------- |
 | `list_directory_tool`      | Explore folder structure                        | `path: str`                                                                                    |
 | `propose_file_action_tool` | Register a categorization decision              | `file_path`, `suggested_name`, `suggested_category`, `summary_reason`, `is_junk`, `confidence` |
+| `propose_directory_action_tool`| Register a decision for an entire folder    | `directory_path`, `decision` (move_intact or split), `suggested_name`, `suggested_category`, `summary_reason`, `confidence` |
 
 ### ReAct reasoning pattern
 

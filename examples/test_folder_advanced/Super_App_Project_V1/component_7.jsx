@@ -1,0 +1,1 @@
+export const Component7 = () => <div>App</div>;

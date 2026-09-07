@@ -46,7 +46,7 @@ class FileActionInput(BaseModel):
     confidence: int = Field(default=85, description="Confidence score (0-100). Use 95-100 for obvious files (clear dates, obvious context). Use 70-85 for files with vague names or partial context. Use <60 for ambiguous files where you are guessing.")
 
 
-def build_propose_tool(proposals: dict):
+def build_propose_tool(proposals: dict, rate_limiter=None):
     """Creates a propose_file_action_tool that writes into the given *proposals* dict.
 
     This avoids module-level mutable state: the caller owns the dict and passes it in.
@@ -64,6 +64,9 @@ def build_propose_tool(proposals: dict):
         """Registers the final decision on how to rename and categorize a file.
         You MUST call this tool for each file you analyze once you've decided what to do with it.
         """
+        if rate_limiter:
+            rate_limiter.acquire_sync()
+
         proposals[file_path] = {
             "file_path": file_path,
             "suggested_name": suggested_name,
@@ -76,3 +79,46 @@ def build_propose_tool(proposals: dict):
 
     return propose_file_action_tool
 
+
+class DirectoryActionInput(BaseModel):
+    directory_path: str = Field(description="The original absolute path of the directory.")
+    decision: str = Field(description="Must be either 'move_intact' or 'split'. Use 'move_intact' if it's a cohesive project folder. Use 'split' if it's a messy dump folder.")
+    suggested_name: str = Field(default="", description="If moving intact, the new descriptive name for the folder (e.g., 'Project_Alpha'). Leave empty if splitting.")
+    suggested_category: str = Field(default="", description="If moving intact, the main logical destination folder (e.g., 'Work/Projects'). Leave empty if splitting.")
+    reasoning: str = Field(description="Short explanation of this choice.")
+
+
+def build_propose_directory_tool(proposals: dict, rate_limiter=None):
+    """Creates a propose_directory_action_tool."""
+
+    @tool(args_schema=DirectoryActionInput)
+    def propose_directory_action_tool(
+        directory_path: str,
+        decision: str,
+        reasoning: str,
+        suggested_name: str = "",
+        suggested_category: str = "",
+    ) -> str:
+        """Registers the final decision on how to handle a DIRECTORY.
+        If the directory is a cohesive project, use decision='move_intact'.
+        If it's a messy dump folder with unrelated files, use decision='split'.
+        """
+        if rate_limiter:
+            rate_limiter.acquire_sync()
+
+        if decision not in ["move_intact", "split"]:
+            return "Error: decision must be 'move_intact' or 'split'."
+
+        proposals[directory_path] = {
+            "file_path": directory_path,  # Use same key name for compatibility
+            "is_dir": True,
+            "decision": decision,
+            "suggested_name": suggested_name,
+            "suggested_category": suggested_category,
+            "summary_reason": reasoning,
+            "is_junk": False,
+            "confidence": 95,
+        }
+        return f"Recorded directory proposal for {Path(directory_path).name} -> {decision}"
+
+    return propose_directory_action_tool
