@@ -381,4 +381,4 @@ MIT
 
 ---
 
-**Built by [Odilon Vidal](https://github.com/odilonv)**
+**Built by [Odilon Vidal](https://www.linkedin.com/in/odilon-vidal/)**
