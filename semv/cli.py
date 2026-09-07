@@ -103,17 +103,32 @@ def _print_scan_summary(
     console.print(Panel(summary, title="[bold]Scan Summary[/bold]", border_style="cyan"))
 
 
-def _print_proposals(proposals: dict, root_dir_str: str):
+def _print_proposals(proposals: dict, root_dir_str: str, page: int = 0, per_page: int = 50):
     """Display proposals in a formatted Rich table."""
-    table = Table(title="Agent Proposed Organization", show_lines=True)
+    import math
+    
+    items = list(proposals.items())
+    total_items = len(items)
+    total_pages = max(1, math.ceil(total_items / per_page))
+    
+    if page >= total_pages:
+        page = total_pages - 1
+    if page < 0:
+        page = 0
+        
+    start_idx = page * per_page
+    end_idx = min(start_idx + per_page, total_items)
+    
+    displayed_items = items[start_idx:end_idx]
+
+    table = Table(
+        title=f"Agent Proposed Organization (Page {page + 1} of {total_pages})", 
+        show_lines=True
+    )
     table.add_column("Original File", style="dim", overflow="fold")
     table.add_column("New Folder", style="cyan", overflow="fold")
     table.add_column("New Name", style="green", overflow="fold")
     table.add_column("Confidence", justify="center")
-
-    MAX_ROWS = 200
-    items = list(proposals.items())
-    displayed_items = items[:MAX_ROWS]
 
     for file_path, action in displayed_items:
         conf = action.get("confidence", 85)
@@ -135,13 +150,13 @@ def _print_proposals(proposals: dict, root_dir_str: str):
             table.add_row(
                 display_orig,
                 "[red][Recycle Bin][/red]",
-                action["suggested_name"],
+                action.get("suggested_name", display_orig),
                 conf_str
             )
         else:
             root_dir = Path(root_dir_str)
-            target_dir = root_dir / action["suggested_category"]
-            suggested_name = action["suggested_name"]
+            target_dir = root_dir / action.get("suggested_category", "Uncategorized")
+            suggested_name = action.get("suggested_name", display_orig)
             
             original_ext = original_path.suffix
             if original_ext and not suggested_name.lower().endswith(original_ext.lower()):
@@ -161,17 +176,12 @@ def _print_proposals(proposals: dict, root_dir_str: str):
             else:
                 table.add_row(
                     display_orig,
-                    action["suggested_category"],
-                    action["suggested_name"],
+                    action.get("suggested_category", "Uncategorized"),
+                    suggested_name,
                     conf_str
                 )
     console.print(table)
-    
-    if len(items) > MAX_ROWS:
-        remaining = len(items) - MAX_ROWS
-        console.print(f"[dim]... and {remaining} more files not shown. (Approve will apply to all {len(items)} files)[/dim]")
-        
-    console.print("\n")
+    console.print(f"[dim]Showing files {start_idx + 1} to {end_idx} out of {total_items}[/dim]\n")
 
 
 def _apply_proposals(proposals: dict, target_dir: Path) -> int:
@@ -283,7 +293,18 @@ def undo():
     console.print(f"[bold green]Undo complete! Restored {success_count} files.[/bold green]")
 
 
-@app.command()
+@app.command(name="clean")
+def clean(
+    path: str = typer.Argument(..., help="Directory to clean interactively"),
+    batch: bool = typer.Option(False, "--batch", help="Force Mistral Batch API mode"),
+    recursive: bool = typer.Option(False, "--recursive", help="Flatten and process all nested files"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show proposals without deleting"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug logging"),
+):
+    """Run the Agentic cleaner to find and delete junk files."""
+    _run_organize(path, multi_agent=False, batch=batch, recursive=recursive, dry_run=dry_run, verbose=verbose, operation_mode="clean")
+
+@app.command(name="organize")
 def organize(
     path: str = typer.Argument(..., help="Directory to organize interactively"),
     multi_agent: bool = typer.Option(False, "--multi-agent", help="Use specialized agents for Code, Finance, etc."),
@@ -293,6 +314,18 @@ def organize(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug logging"),
 ):
     """Run the Agentic organizer interactively on a directory."""
+    _run_organize(path, multi_agent=multi_agent, batch=batch, recursive=recursive, dry_run=dry_run, verbose=verbose, operation_mode="organize")
+
+def _run_organize(
+    path: str,
+    multi_agent: bool,
+    batch: bool,
+    recursive: bool,
+    dry_run: bool,
+    verbose: bool,
+    operation_mode: str,
+):
+    """Internal pipeline runner for both organize and clean commands."""
     setup_logging(verbose=verbose)
     cleanup_old_sessions()
     
@@ -324,8 +357,11 @@ def organize(
         if resume and session.proposals:
             console.print(f"[bold green]Resumed {len(session.proposals)} cached proposals.[/bold green]")
             _print_proposals(session.proposals, str(target_dir))
-            # Jump to approval flow
-            _approval_flow(session.proposals, target_dir, dry_run, session)
+            if operation_mode == "clean":
+                session.proposals = {k: v for k, v in session.proposals.items() if v.get("is_junk")}
+                _clean_approval_flow(session.proposals, target_dir, dry_run, session)
+            else:
+                _approval_flow(session.proposals, target_dir, dry_run, session)
             return
         elif not resume:
             session.clear()
@@ -457,6 +493,7 @@ def organize(
                 custom_taxonomy=custom_taxonomy,
                 on_status=_on_batch_status,
                 session_state=session,
+                operation_mode=operation_mode,
             )
             proposals.update(batch_proposals)
             
@@ -527,6 +564,7 @@ def organize(
                             batch_proposals = run_organizer_agent(
                                 str(target_dir), unprocessed,
                                 rate_limiter=rate_limiter,
+                                operation_mode=operation_mode,
                             )
                         
                         # Handle splits and update proposals
@@ -595,16 +633,202 @@ def organize(
         session.clear()
         return
 
-    _approval_flow(proposals, target_dir, dry_run, session)
+    if operation_mode == "clean":
+        proposals = {k: v for k, v in proposals.items() if v.get("is_junk")}
+        if not proposals:
+            console.print("[yellow]No junk files found. Your folder is clean![/yellow]")
+            session.clear()
+            return
+        _clean_approval_flow(proposals, target_dir, dry_run, session)
+    else:
+        _approval_flow(proposals, target_dir, dry_run, session)
+
+def _print_clean_proposals(proposals: dict, root_dir_str: str, page: int = 0, per_page: int = 50):
+    """Display cleanup proposals in a formatted Rich table."""
+    import math
+    
+    items = list(proposals.items())
+    total_items = len(items)
+    total_pages = max(1, math.ceil(total_items / per_page))
+    
+    if page >= total_pages:
+        page = total_pages - 1
+    if page < 0:
+        page = 0
+        
+    start_idx = page * per_page
+    end_idx = min(start_idx + per_page, total_items)
+    
+    displayed_items = items[start_idx:end_idx]
+
+    table = Table(
+        title=f"🗑️ Agent Identified Junk (Page {page + 1} of {total_pages})", 
+        show_lines=True
+    )
+    table.add_column("File to Delete", style="dim", overflow="fold")
+    table.add_column("Reason", style="yellow", overflow="fold")
+    table.add_column("Confidence", justify="center")
+
+    for file_path, action in displayed_items:
+        conf = action.get("confidence", 85)
+        if conf >= 85:
+            conf_str = f"[bold green]{conf}%[/bold green]"
+        elif conf >= 60:
+            conf_str = f"[bold yellow]{conf}%[/bold yellow]"
+        else:
+            conf_str = f"[bold red]{conf}%[/bold red]"
+
+        original_path = Path(file_path)
+        try:
+            display_orig = str(original_path.relative_to(Path(root_dir_str)))
+        except ValueError:
+            display_orig = original_path.name
+
+        table.add_row(
+            display_orig,
+            action.get("summary_reason", "No reason provided"),
+            conf_str
+        )
+    console.print(table)
+    console.print(f"[dim]Showing files {start_idx + 1} to {end_idx} out of {total_items}[/dim]\n")
+
+
+def _clean_approval_flow(proposals: dict, target_dir: Path, dry_run: bool, session: SessionState):
+    """Interactive approval loop for clean mode."""
+    import math
+    current_page = 0
+    per_page = 50
+    
+    while True:
+        _print_clean_proposals(proposals, str(target_dir), page=current_page, per_page=per_page)
+
+        total_pages = max(1, math.ceil(len(proposals) / per_page))
+
+        choices = [
+            questionary.Choice("[Delete] Move all to Recycle Bin", value="approve"),
+            questionary.Choice("[Cancel] Do not delete anything", value="cancel"),
+        ]
+        
+        if current_page < total_pages - 1:
+            choices.insert(1, questionary.Choice(f"[Next Page] Show files { (current_page+1)*per_page + 1 }-{ min((current_page+2)*per_page, len(proposals)) }", value="next"))
+        if current_page > 0:
+            choices.insert(1, questionary.Choice(f"[Previous Page] Show files { (current_page-1)*per_page + 1 }-{ current_page*per_page }", value="prev"))
+
+        if dry_run:
+            console.print("[bold yellow]Dry run mode - no files will be deleted.[/bold yellow]")
+            session.clear()
+            return
+
+        choice = questionary.select(
+            "What would you like to do with these junk files?",
+            choices=choices
+        ).ask()
+        
+        if choice == "next":
+            current_page += 1
+            continue
+        elif choice == "prev":
+            current_page -= 1
+            continue
+
+        if choice == "approve":
+            success_count = 0
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[bold red]{task.description}"),
+                BarColumn(),
+                MofNCompleteColumn(),
+                console=console,
+            ) as progress:
+                task = progress.add_task("Moving to Recycle Bin...", total=len(proposals))
+                for file_path in proposals.keys():
+                    if trash_file(file_path):
+                        success_count += 1
+                    progress.advance(task)
+
+            console.print(f"\n[bold green]Cleaned up! {success_count} files moved to the Recycle Bin.[/bold green]")
+            session.phase = "done"
+            session.clear()
+            break
+        else:
+            console.print("[yellow]Cleanup cancelled.[/yellow]")
+            session.clear()
+            break
+
+
+def _print_tree_preview(proposals: dict, root_dir_str: str):
+    """Print a tree view of the proposed folder architecture."""
+    from rich.tree import Tree
+    
+    # Build a simple representation of categories -> files
+    categories = {}
+    for file_path, action in proposals.items():
+        if action.get("is_junk"):
+            cat = "[Recycle Bin]"
+            name = action.get("suggested_name", Path(file_path).name)
+        else:
+            cat = action.get("suggested_category", "Uncategorized")
+            name = action.get("suggested_name", Path(file_path).name)
+            
+            # Ensure correct extension
+            ext = Path(file_path).suffix
+            if ext and not name.lower().endswith(ext.lower()):
+                name += ext
+
+        if cat not in categories:
+            categories[cat] = []
+        categories[cat].append(name)
+        
+    tree = Tree(f"📁 [bold]{Path(root_dir_str).name} (Preview)[/bold]")
+    
+    for cat, files in sorted(categories.items()):
+        if cat == "[Recycle Bin]":
+            cat_node = tree.add(f"🗑️ [bold red]{cat}[/bold red]")
+        else:
+            cat_node = tree.add(f"📁 [bold cyan]{cat}[/bold cyan]")
+            
+        # Display up to 5 files per category to keep it readable
+        display_files = sorted(files)
+        MAX_FILES_IN_TREE = 5
+        for f in display_files[:MAX_FILES_IN_TREE]:
+            cat_node.add(f"📄 [dim]{f}[/dim]")
+            
+        if len(display_files) > MAX_FILES_IN_TREE:
+            cat_node.add(f"[dim]... and {len(display_files) - MAX_FILES_IN_TREE} more files[/dim]")
+            
+    console.print(tree)
+    console.print("\n")
 
 
 def _approval_flow(proposals: dict, target_dir: Path, dry_run: bool, session: SessionState):
     """Interactive approval loop with feedback support."""
+    import math
     feedback = None
+    current_page = 0
+    per_page = 50
+    show_tree = False
     
     while True:
-        _print_proposals(proposals, str(target_dir))
+        if show_tree:
+            _print_tree_preview(proposals, str(target_dir))
+            show_tree = False
+        else:
+            _print_proposals(proposals, str(target_dir), page=current_page, per_page=per_page)
 
+        total_pages = max(1, math.ceil(len(proposals) / per_page))
+
+
+        choices = [
+            questionary.Choice("[Approve] Apply changes", value="approve"),
+            questionary.Choice("[Tree View] Preview final folder architecture", value="tree"),
+            questionary.Choice("[Feedback] Provide instructions to refine", value="feedback"),
+            questionary.Choice("[Cancel] Do not make changes", value="cancel"),
+        ]
+        
+        if current_page < total_pages - 1:
+            choices.insert(1, questionary.Choice(f"[Next Page] Show files { (current_page+1)*per_page + 1 }-{ min((current_page+2)*per_page, len(proposals)) }", value="next"))
+        if current_page > 0:
+            choices.insert(1, questionary.Choice(f"[Previous Page] Show files { (current_page-1)*per_page + 1 }-{ current_page*per_page }", value="prev"))
 
         if dry_run:
             console.print("[bold yellow]Dry run mode - no files will be moved.[/bold yellow]")
@@ -613,12 +837,18 @@ def _approval_flow(proposals: dict, target_dir: Path, dry_run: bool, session: Se
 
         choice = questionary.select(
             "What would you like to do?",
-            choices=[
-                questionary.Choice("[Approve] Apply changes", value="approve"),
-                questionary.Choice("[Feedback] Provide instructions to refine", value="feedback"),
-                questionary.Choice("[Cancel] Do not make changes", value="cancel"),
-            ]
+            choices=choices
         ).ask()
+        
+        if choice == "next":
+            current_page += 1
+            continue
+        elif choice == "prev":
+            current_page -= 1
+            continue
+        elif choice == "tree":
+            show_tree = True
+            continue
 
         if choice == "approve":
             success_count = _apply_proposals(proposals, target_dir)

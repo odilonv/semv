@@ -32,8 +32,19 @@ POLL_INTERVAL_SECONDS = 10
 MAX_POLL_DURATION_SECONDS = 3600  # 1 hour timeout
 
 
-def _build_system_prompt(custom_taxonomy: list[str] | None = None) -> str:
+def _build_system_prompt(custom_taxonomy: list[str] | None = None, operation_mode: str = "organize") -> str:
     """Build the system prompt for batch classification."""
+    if operation_mode == "clean":
+        return """\
+You are a file cleanup assistant. For each file, respond with ONLY a JSON object (no markdown, no explanation):
+{"is_junk": true, "summary_reason": "short reason why it's junk", "confidence": 95}
+
+Rules:
+- is_junk=true for installers, temp files, caches, useless logs, duplicated fragments, or redundant data.
+- is_junk=false for actual user documents, code, media, etc.
+- confidence: 95-100 obvious, 70-85 guesses, <60 ambiguous.
+"""
+
     if custom_taxonomy:
         tax_str = ", ".join(f"'{t}'" for t in custom_taxonomy)
         taxonomy_block = f"Use these ROOT folders: {tax_str}"
@@ -67,6 +78,7 @@ def generate_batch_jsonl(
     files_data: list[dict],
     output_path: Path,
     custom_taxonomy: list[str] | None = None,
+    operation_mode: str = "organize",
 ) -> int:
     """Generate a JSONL file for Mistral Batch API.
 
@@ -74,7 +86,7 @@ def generate_batch_jsonl(
 
     Returns the number of requests written.
     """
-    system_prompt = _build_system_prompt(custom_taxonomy)
+    system_prompt = _build_system_prompt(custom_taxonomy, operation_mode=operation_mode)
     count = 0
 
     with open(output_path, "w", encoding="utf-8") as f:
@@ -103,12 +115,16 @@ def _get_mistral_client():
     import os
 
     try:
-        from mistralai import Mistral
-    except ImportError:
-        raise ImportError(
-            "The 'mistralai' package is required for batch mode. "
-            "Install it with: pip install mistralai"
-        )
+        from mistralai.client import Mistral
+    except ImportError as e1:
+        try:
+            # Fallback for some older v1.x versions
+            from mistralai import Mistral
+        except ImportError as e2:
+            raise ImportError(
+                f"The 'mistralai' package is required for batch mode. "
+                f"Error 1: {e1}. Error 2: {e2}. Install it with: pip install mistralai"
+            )
 
     config = load_config()
     api_key = config.get("api_key") or os.environ.get("MISTRAL_API_KEY")
@@ -252,9 +268,32 @@ def download_and_parse_results(job_id: str) -> dict[str, dict]:
 
     # result_content may be bytes or a response object
     if isinstance(result_content, bytes):
-        lines = result_content.decode("utf-8").strip().split("\n")
+        content_str = result_content.decode("utf-8")
     else:
-        lines = result_content.text.strip().split("\n")
+        content_str = None
+        if hasattr(result_content, "read"):
+            try:
+                # If it's an httpx.Response that needs to be read
+                read_data = result_content.read()
+                if isinstance(read_data, bytes):
+                    content_str = read_data.decode("utf-8")
+                else:
+                    content_str = str(read_data)
+            except Exception:
+                pass
+        
+        if content_str is None:
+            if hasattr(result_content, "text"):
+                try:
+                    content_str = result_content.text
+                except Exception:
+                    pass
+            
+            if content_str is None:
+                # Fallback for iterators or other types
+                content_str = b"".join(result_content).decode("utf-8")
+
+    lines = content_str.strip().split("\n")
 
     for line in lines:
         if not line.strip():
@@ -307,6 +346,7 @@ def run_batch_pipeline(
     custom_taxonomy: list[str] | None = None,
     on_status: Callable[[str], None] | None = None,
     session_state=None,
+    operation_mode: str = "organize",
 ) -> dict[str, dict]:
     """Run the complete batch pipeline.
 
@@ -315,6 +355,7 @@ def run_batch_pipeline(
         custom_taxonomy: Optional custom root folder names.
         on_status: Callback for status messages.
         session_state: Optional SessionState for save/resume.
+        operation_mode: The mode of operation to use.
 
     Returns:
         Dict mapping file_path -> proposal dict.
@@ -361,11 +402,11 @@ def run_batch_pipeline(
 
         # Generate JSONL
         with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".jsonl", delete=False, dir=None
+            mode="w", suffix=".jsonl", delete=False, encoding="utf-8"
         ) as tmp:
             jsonl_path = Path(tmp.name)
 
-        generate_batch_jsonl(chunk, jsonl_path, custom_taxonomy)
+        generate_batch_jsonl(chunk, jsonl_path, custom_taxonomy, operation_mode=operation_mode)
 
         # Upload and create job
         if on_status:

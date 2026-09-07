@@ -50,6 +50,28 @@ CONFIDENCE: 95-100 obvious, 70-85 guesses, <60 ambiguous.
 CRITICAL: Call `propose_file_action_tool` for EVERY file.
 """
 
+CLEAN_SYSTEM_PROMPT = """\
+You are an advanced file cleanup assistant.
+Your ONLY goal is to identify files that are junk and can be safely deleted.
+
+Steps:
+For FILES:
+- Use propose_file_action_tool to decide if it is junk.
+- ALWAYS set suggested_category="[Recycle Bin]", keep the original name, and provide a summary_reason.
+
+For DIRECTORIES:
+- Analyze its name. If unsure, use list_directory_tool to see what's inside.
+- If it's a messy dump folder, use propose_directory_action_tool with decision='split' to evaluate its contents.
+
+You MUST call propose_file_action_tool or propose_directory_action_tool for EVERY item provided.
+
+RULES:
+- is_junk=true for installers, temp files, caches, useless logs, duplicated fragments, or redundant data.
+- is_junk=false for actual user documents, code, media, etc.
+- CONFIDENCE: 95-100 obvious, 70-85 guesses, <60 ambiguous.
+- CRITICAL: Call `propose_file_action_tool` for EVERY file.
+"""
+
 
 def _resolve_api_key() -> str:
     config = load_config()
@@ -64,6 +86,7 @@ def run_organizer_agent(
     files_with_content: list[dict],
     feedback: str | None = None,
     rate_limiter: RateLimiter | None = None,
+    operation_mode: str = "organize",
 ) -> dict:
     """Runs the ReAct agent on the given files and returns a dict of proposals.
 
@@ -85,15 +108,19 @@ def run_organizer_agent(
     tools = [list_directory_tool, propose_tool, propose_dir_tool]
 
     config = load_config()
-    custom_tax = config.get("taxonomy")
-    if custom_tax:
-        tax_str = ", ".join(f"'{t}'" for t in custom_tax)
-        dynamic_prompt = SYSTEM_PROMPT.replace(
-            "ONLY use these ROOT folders unless impossible:\n  * 'Work' (Professional documents, business reports, meeting notes)\n  * 'Personal' (Private notes, grocery lists, personal letters)\n  * 'Finance' (Invoices, receipts, tax documents)\n  * 'Code' (Source code, HTML, CSS, configs, scripts)\n  * 'Media' (Images, videos, audio)\n  * 'Archives' (ZIP files, backups)",
-            f"ONLY use these USER-DEFINED ROOT folders unless impossible: {tax_str}"
-        )
+    
+    if operation_mode == "clean":
+        dynamic_prompt = CLEAN_SYSTEM_PROMPT
     else:
-        dynamic_prompt = SYSTEM_PROMPT
+        custom_tax = config.get("taxonomy")
+        if custom_tax:
+            tax_str = ", ".join(f"'{t}'" for t in custom_tax)
+            dynamic_prompt = SYSTEM_PROMPT.replace(
+                "ONLY use these ROOT folders unless impossible:\n  * 'Work' (Professional documents, business reports, meeting notes)\n  * 'Personal' (Private notes, grocery lists, personal letters)\n  * 'Finance' (Invoices, receipts, tax documents)\n  * 'Code' (Source code, HTML, CSS, configs, scripts)\n  * 'Media' (Images, videos, audio)\n  * 'Archives' (ZIP files, backups)",
+                f"ONLY use these USER-DEFINED ROOT folders unless impossible: {tax_str}"
+            )
+        else:
+            dynamic_prompt = SYSTEM_PROMPT
 
     if feedback:
         dynamic_prompt += (
