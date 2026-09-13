@@ -17,6 +17,7 @@ import json
 import shutil
 import signal
 import sys
+import os
 
 from semv.config import load_config, save_config, is_configured, run_setup_wizard, get_setting
 from semv.organizer import apply_file_action, trash_file, HISTORY_FILE, clear_history
@@ -331,6 +332,20 @@ def _run_organize(
     
     if not is_configured():
         run_setup_wizard()
+        
+    # Set up LangSmith observability
+    config = load_config()
+    langsmith_key = config.get("langsmith_api_key") or os.environ.get("LANGCHAIN_API_KEY")
+    if langsmith_key:
+        os.environ["LANGCHAIN_TRACING_V2"] = "true"
+        os.environ["LANGCHAIN_API_KEY"] = langsmith_key.strip()
+        os.environ["LANGCHAIN_PROJECT"] = "semv"
+        
+        endpoint = config.get("langsmith_endpoint")
+        if endpoint:
+            os.environ["LANGCHAIN_ENDPOINT"] = endpoint
+            
+        logger.info("LangSmith tracing enabled for project 'semv'")
         
     target_dir = Path(path).expanduser().resolve()
     if not target_dir.exists() or not target_dir.is_dir():

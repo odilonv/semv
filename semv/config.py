@@ -82,5 +82,17 @@ def run_setup_wizard():
         if custom_tax:
             config_data["taxonomy"] = [t.strip() for t in custom_tax.split(",")]
     
+    wants_langsmith = questionary.confirm("Do you want to enable LangSmith tracing for observability?").ask()
+    if wants_langsmith:
+        langsmith_key = questionary.password("Enter your LangSmith API Key:").ask()
+        if langsmith_key:
+            region = questionary.select("Select your LangSmith region:", choices=["US (Default)", "EU"]).ask()
+            config_data["langsmith_api_key"] = langsmith_key.strip()
+            if region == "EU":
+                config_data["langsmith_endpoint"] = "https://eu.api.smith.langchain.com"
+            else:
+                config_data["langsmith_endpoint"] = "https://api.smith.langchain.com"
+            _console.print("[green]LangSmith configuration saved![/green]")
+            
     save_config(config_data)
     logger.info("Setup wizard completed (mode=%s)", mode)
