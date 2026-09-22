@@ -367,8 +367,16 @@ def _run_organize(
     # -- Check for resumable session --------------------------------------
     session = SessionState.load(str(target_dir))
     if session and session.resumable:
-        # Headless test bypass
-        resume = False
+        # Allow headless bypass via environment variable
+        if os.environ.get("SEMV_HEADLESS"):
+            resume = False
+        else:
+            resume = questionary.confirm(
+                f"A previous session was found ({len(session.proposals)} proposals cached). Resume?"
+            ).ask()
+            if resume is None:
+                raise typer.Exit()
+
         if resume and session.proposals:
             console.print(f"[bold green]Resumed {len(session.proposals)} cached proposals.[/bold green]")
             _print_proposals(session.proposals, str(target_dir))
@@ -488,6 +496,34 @@ def _run_organize(
 
     session.phase = "processing"
     session.save()
+
+    # -- Phase 3.5: Ensure local model is ready (if local mode) ---------------
+    config = load_config()
+    if config.get("mode") == "local":
+        from semv.agent.local_llm import is_model_ready, ensure_model_ready, DEFAULT_MODEL_FILE
+
+        if not is_model_ready():
+            console.print(f"\n[bold cyan][>>] Downloading local model [white]{DEFAULT_MODEL_FILE}[/white] (~4GB)...[/bold cyan]")
+            console.print("[dim]This is a one-time download. The model will be cached for future runs.[/dim]\n")
+            try:
+                ensure_model_ready()
+                console.print(f"[bold green][✓] Model downloaded successfully![/bold green]\n")
+            except KeyboardInterrupt:
+                console.print("\n[yellow][!] Download interrupted. It will resume from where it left off next time.[/yellow]")
+                return
+            except Exception as e:
+                console.print(f"[bold red]Failed to download model:[/bold red] {e}")
+                return
+
+        # Pre-load the LLM into memory before processing
+        console.print(f"\n[bold cyan][>>] Loading local model into memory...[/bold cyan]")
+        try:
+            from semv.agent.local_llm import get_local_llm
+            get_local_llm()
+            console.print(f"[bold green][✓] Local model loaded![/bold green]")
+        except Exception as e:
+            console.print(f"[bold red]Failed to load local model:[/bold red] {e}")
+            return
 
     # -- Phase 4: AI Processing -------------------------------------------
     if use_batch:

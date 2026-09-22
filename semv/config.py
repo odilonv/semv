@@ -69,11 +69,19 @@ def run_setup_wizard():
     config_data = {"mode": mode}
 
     if mode == "cloud":
-        api_key = questionary.password("Enter your Mistral API Key:").ask()
-        config_data["api_key"] = api_key
+        import os
+        existing_key = os.environ.get("MISTRAL_API_KEY")
+        if existing_key:
+            _console.print("[green]✓ MISTRAL_API_KEY detected in your environment.[/green]")
+        else:
+            _console.print("\n[bold yellow]Set your Mistral API key as an environment variable:[/bold yellow]")
+            _console.print("[dim]  Linux/macOS:[/dim]  export MISTRAL_API_KEY=\"your_key_here\"")
+            _console.print("[dim]  Windows:   [/dim]  $env:MISTRAL_API_KEY=\"your_key_here\"")
+            _console.print("[dim]  Get a free key at: https://console.mistral.ai/api-keys/[/dim]\n")
         _console.print("[green]Cloud configuration saved![/green]")
     else:
-        _console.print("\n[bold yellow]Note:[/bold yellow] The Mistral model (~4GB) will be downloaded automatically on the first run.")
+        _console.print("\n[bold yellow]Note:[/bold yellow] The Mistral 7B model (~4GB) will be downloaded automatically on the first run.")
+        _console.print("[dim]Requires: pip install 'semv\\[local]'[/dim]")
         _console.print("[green]Local configuration saved![/green]")
 
     wants_custom = questionary.confirm("Do you want to define a custom folder taxonomy? (Default: Work, Personal, Finance, Code, Media, Archives)").ask()

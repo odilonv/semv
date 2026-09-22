@@ -45,11 +45,34 @@ class AgentState(TypedDict):
 
 
 def _resolve_api_key() -> str:
-    config = load_config()
-    key = config.get("api_key") or os.environ.get("MISTRAL_API_KEY")
+    key = os.environ.get("MISTRAL_API_KEY")
     if not key:
-        raise ValueError("No Mistral API key found. Run 'semv organize' to configure.")
+        raise ValueError(
+            "No Mistral API key found. Set the MISTRAL_API_KEY environment variable.\n"
+            "  Linux/macOS:  export MISTRAL_API_KEY=\"your_key_here\"\n"
+            "  Windows:      $env:MISTRAL_API_KEY=\"your_key_here\"\n"
+            "  Get a free key at: https://console.mistral.ai/api-keys/"
+        )
     return key
+
+
+def _create_llm():
+    """Create the appropriate LLM based on the configured mode."""
+    config = load_config()
+    mode = config.get("mode", "cloud")
+
+    if mode == "local":
+        from semv.agent.local_llm import get_local_llm
+        return get_local_llm()
+
+    # Default: cloud mode via Mistral API
+    api_key = _resolve_api_key()
+    return ChatMistralAI(
+        model="mistral-small-latest",
+        temperature=0,
+        api_key=api_key,
+        max_retries=3,
+    )
 
 
 def supervisor_node(state: AgentState):
@@ -105,13 +128,7 @@ def create_specialized_agent(
         return {"proposals": {}, "errors": {}}
         
     try:
-        api_key = _resolve_api_key()
-        llm = ChatMistralAI(
-            model="mistral-small-latest",
-            temperature=0,
-            api_key=api_key,
-            max_retries=3,
-        )
+        llm = _create_llm()
         
         proposals = {}
         propose_tool = build_propose_tool(proposals, rate_limiter=rate_limiter)

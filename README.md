@@ -183,12 +183,18 @@ semv/
 
 - **Python 3.10+**
 - **Poetry** (recommended) or pip
-- A **Mistral AI API key** ([get one free](https://console.mistral.ai/api-keys/))
+- A **Mistral AI API key** ([get one free](https://console.mistral.ai/api-keys/)) — for cloud mode
 
 ### Install with pipx (recommended for end users)
 
 ```bash
 pipx install git+https://github.com/odilonv/semv.git
+```
+
+For **local inference** (offline, privacy-first):
+
+```bash
+pipx install "semv[local] @ git+https://github.com/odilonv/semv.git"
 ```
 
 ### Install for development
@@ -197,6 +203,8 @@ pipx install git+https://github.com/odilonv/semv.git
 git clone https://github.com/odilonv/semv.git
 cd semv
 poetry install
+# For local inference support:
+poetry install -E local
 ```
 
 ---
@@ -210,24 +218,30 @@ On first use, `semv` launches an interactive setup wizard:
 > Cloud (Mistral API - Fast, 0GB disk space)
   Local (Mistral 7B - Privacy First, ~4GB disk space)
 
-? Enter your Mistral API Key: ********************************
+Set your Mistral API key as an environment variable:
+  Linux/macOS:  export MISTRAL_API_KEY="your_key_here"
+  Windows:      $env:MISTRAL_API_KEY="your_key_here"
 Cloud configuration saved!
 ```
 
-Configuration is stored at `~/.config/semv/config.json`:
+The API key is read from the `MISTRAL_API_KEY` environment variable.
+Configuration preferences are stored at `~/.config/semv/config.json`:
 
 ```json
 {
   "mode": "cloud",
-  "api_key": "your_api_key_here",
   "taxonomy": ["Work", "Personal", "Finance", "Code", "Media", "Archives"]
 }
 ```
 
-You can also set the key via environment variable:
+Set the key in your shell profile for persistence:
 
 ```bash
+# Linux/macOS (~/.bashrc, ~/.zshrc, etc.)
 export MISTRAL_API_KEY="your_api_key_here"
+
+# Windows (PowerShell profile)
+$env:MISTRAL_API_KEY="your_api_key_here"
 ```
 
 ---
@@ -301,17 +315,17 @@ semv undo
 
 ## Technology stack
 
-| Layer                 | Technology                                                                                | Purpose                                    |
-| :-------------------- | :---------------------------------------------------------------------------------------- | :----------------------------------------- |
-| **CLI**               | [Typer](https://typer.tiangolo.com/)                                                      | Command parsing, argument handling         |
-| **Terminal UI**       | [Rich](https://rich.readthedocs.io/) + [Questionary](https://questionary.readthedocs.io/) | Tables, progress bars, interactive prompts |
-| **Agent framework**   | [LangGraph](https://langchain-ai.github.io/langgraph/)                                    | ReAct agent loop with tool calling         |
-| **LLM (Cloud)**       | [Mistral AI](https://mistral.ai/) via `langchain-mistralai`                               | Function calling, structured reasoning     |
-| **LLM (Local)**       | [llama-cpp-python](https://github.com/abetlen/llama-cpp-python)                           | Offline inference with Mistral 7B GGUF     |
-| **PDF parsing**       | [PyMuPDF](https://pymupdf.readthedocs.io/)                                                | Text extraction from PDF files             |
-| **Schema validation** | [Pydantic](https://docs.pydantic.dev/)                                                    | Tool input/output validation               |
-| **File operations**   | `shutil` + [send2trash](https://github.com/arsenetar/send2trash)                          | Safe move + OS-native Recycle Bin          |
-| **Config**            | JSON (`~/.config/semv/`)                                                                  | Persistent user configuration              |
+| Layer                 | Technology                                                                                                | Purpose                                    |
+| :-------------------- | :-------------------------------------------------------------------------------------------------------- | :----------------------------------------- |
+| **CLI**               | [Typer](https://typer.tiangolo.com/)                                                                      | Command parsing, argument handling         |
+| **Terminal UI**       | [Rich](https://rich.readthedocs.io/) + [Questionary](https://questionary.readthedocs.io/)                 | Tables, progress bars, interactive prompts |
+| **Agent framework**   | [LangGraph](https://langchain-ai.github.io/langgraph/)                                                    | ReAct agent loop with tool calling         |
+| **LLM (Cloud)**       | [Mistral AI](https://mistral.ai/) via `langchain-mistralai`                                               | Function calling, structured reasoning     |
+| **LLM (Local)**       | [llama-cpp-python](https://github.com/abetlen/llama-cpp-python) _(optional: `pip install 'semv[local]'`)_ | Offline inference with Mistral 7B GGUF     |
+| **PDF parsing**       | [PyMuPDF](https://pymupdf.readthedocs.io/)                                                                | Text extraction from PDF files             |
+| **Schema validation** | [Pydantic](https://docs.pydantic.dev/)                                                                    | Tool input/output validation               |
+| **File operations**   | `shutil` + [send2trash](https://github.com/arsenetar/send2trash)                                          | Safe move + OS-native Recycle Bin          |
+| **Config**            | JSON (`~/.config/semv/`)                                                                                  | Persistent user configuration              |
 
 ---
 
@@ -319,11 +333,12 @@ semv undo
 
 ### Tool calling via Function Calling
 
-The agent has access to two tools, each defined with a Pydantic schema for strict input validation:
+The agent has access to the following tools, each defined with a Pydantic schema for strict input validation:
 
 | Tool                            | Purpose                                  | Schema fields                                                                                                               |
 | :------------------------------ | :--------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------- |
 | `list_directory_tool`           | Explore folder structure                 | `path: str`                                                                                                                 |
+| `read_file_snippet_tool`        | Read a file's content on-demand          | `file_path: str`                                                                                                            |
 | `propose_file_action_tool`      | Register a categorization decision       | `file_path`, `suggested_name`, `suggested_category`, `summary_reason`, `is_junk`, `confidence`                              |
 | `propose_directory_action_tool` | Register a decision for an entire folder | `directory_path`, `decision` (move_intact or split), `suggested_name`, `suggested_category`, `summary_reason`, `confidence` |
 

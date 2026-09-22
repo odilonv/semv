@@ -74,11 +74,34 @@ RULES:
 
 
 def _resolve_api_key() -> str:
-    config = load_config()
-    key = config.get("api_key") or os.environ.get("MISTRAL_API_KEY")
+    key = os.environ.get("MISTRAL_API_KEY")
     if not key:
-        raise ValueError("No Mistral API key found. Run 'semv organize' to configure.")
+        raise ValueError(
+            "No Mistral API key found. Set the MISTRAL_API_KEY environment variable.\n"
+            "  Linux/macOS:  export MISTRAL_API_KEY=\"your_key_here\"\n"
+            "  Windows:      $env:MISTRAL_API_KEY=\"your_key_here\"\n"
+            "  Get a free key at: https://console.mistral.ai/api-keys/"
+        )
     return key
+
+
+def _create_llm():
+    """Create the appropriate LLM based on the configured mode."""
+    config = load_config()
+    mode = config.get("mode", "cloud")
+
+    if mode == "local":
+        from semv.agent.local_llm import get_local_llm
+        return get_local_llm()
+
+    # Default: cloud mode via Mistral API
+    api_key = _resolve_api_key()
+    return ChatMistralAI(
+        model="mistral-small-latest",
+        temperature=0,
+        api_key=api_key,
+        max_retries=3,
+    )
 
 
 def run_organizer_agent(
@@ -93,19 +116,13 @@ def run_organizer_agent(
     Each call gets its own proposals dict — no shared mutable state.
     files_with_content is a list of dicts: {"path": str, "content": str}
     """
-    api_key = _resolve_api_key()
-    llm = ChatMistralAI(
-        model="mistral-small-latest",
-        temperature=0,
-        api_key=api_key,
-        max_retries=3,  # Low retries here; we handle retries at a higher level
-    )
+    llm = _create_llm()
 
     proposals: dict = {}
     propose_tool = build_propose_tool(proposals, rate_limiter=rate_limiter)
     propose_dir_tool = build_propose_directory_tool(proposals, rate_limiter=rate_limiter)
 
-    tools = [list_directory_tool, propose_tool, propose_dir_tool]
+    tools = [list_directory_tool, read_file_snippet_tool, propose_tool, propose_dir_tool]
 
     config = load_config()
     

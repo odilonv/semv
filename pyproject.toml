@@ -21,6 +21,11 @@ dependencies = [
     "tenacity (>=8.2.0,<10.0.0)"
 ]
 
+[project.optional-dependencies]
+local = [
+    "llama-cpp-python (>=0.3.0)",
+    "huggingface-hub (>=0.25.0,<1.0.0)",
+]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
